@@ -1,0 +1,135 @@
+
+This are DEVELOPER instructions for Open Transactions builds on Debian Wheezy with Clang and ccache support.
+
+Why?: Very fast builds, debug, clang seems better compiler in case of speed and memory usage.
+
+We reccomend to build it LOCALLY (PER-USER), using --prefix=$HOME/.local/ when configuring
+
+-----------------------------------
+
+1. Dependencies build and installation
+2. Open Transaction build
+3. Subprojects build
+4. Fast rebuilding
+5. Run the software
+
+-----------------------------------
+
+1. Dependencies build and installation
+
+a) Install dependencies:
+	# apt-get install wget git build-essential libtool make cmake pkg-config libssl-dev protobuf-compiler libprotobuf-dev
+
+b) Install ccache (OPTIONAL - for faster rebuilds)
+
+	# apt-get install ccache
+
+	We will setup ccache in local installation later for Clang but if you want to enable ccache for GCC:
+		export PATH=/usr/lib/ccache:$PATH
+
+c) Build and install clang (with full C++11 support - minimum 3.3)
+
+On debian 7 good setup is to system-wide install clang from repository (3.2)
+and user-local build clang:
+
+	# apt-get install clang
+
+Download sources:
+$execute:
+	mkdir ~/llvm && cd ~/llvm
+	wget http://www.llvm.org/releases/3.4.1/cfe-3.4.1.src.tar.gz
+	wget http://www.llvm.org/releases/3.4.1/cfe-3.4.1.src.tar.gz.sig
+	wget http://www.llvm.org/releases/3.4.1/llvm-3.4.1.src.tar.gz
+	wget http://www.llvm.org/releases/3.4.1/llvm-3.4.1.src.tar.gz.sig
+
+Verify downloads:
+$execute:
+	sha512sum *gz
+
+should give:
+	3886d2e362aab52f29520150a81271ee24433118e0519dd5d1c58cfacc3b1c7da4cbab49c7e82d6b4a90c278b5028f5aa1f5d79478b13d0b11a15c491a6c00d5  cfe-3.4.1.src.tar.gz
+	a8d19f8560604cd1a62b9868aca8848c0675895c5354dfcbc81ef940d4a38f56f8239a49aec853dd7d432134fa0b5feb9b070579226400874b761dcf124f7a7b  llvm-3.4.1.src.tar.gz
+
+Packages should be signed with key with fingerprint: 11E5 21D6 4698 2372 EB57  7A1F 8F08 71F2 0211 9294
+$execute:
+	gpg --keyserver pgp.mit.edu --recv-keys 02119294
+	gpg --verify cfe-3.4.1.src.tar.gz.sig
+	gpg --verify llvm-3.4.1.src.tar.gz.sig
+
+Verification output should look like:
+$execute:
+	gpg: Signature made Tue 06 May 2014 17:53:48 CEST using RSA key ID 02119294
+	gpg: Good signature from "Tom Stellard <tom@stellard.net>"
+	gpg: WARNING: This key is not certified with a trusted signature!
+	gpg:          There is no indication that the signature belongs to the owner.
+	Primary key fingerprint: 11E5 21D6 4698 2372 EB57  7A1F 8F08 71F2 0211 9294
+
+Unpack and prepare to build:
+$execute:
+	tar -xzf llvm-3.4.1.src.tar.gz
+	tar -xzf cfe-3.4.1.src.tar.gz
+	mv cfe-3.4.1.src llvm-3.4.1.src/tools/clang
+	mkdir build
+	cd build
+
+Build:
+If compiling with clang - must pass full path to compiler
+If you want LOCAL INSTALLATION pass option '--prefix=$HOME/.local' to configure command
+	CC=/usr/bin/clang CXX=/usr/bin/clang++ ../llvm-3.4.1.src/configure
+	make -j2
+	make install
+
+--------------------------------------------------------------------------
+
+LOCAL INSTALLATION ONLY - Selecting compiler for Open-Transactions (and other env options)
+
+On Linux/Unix, edit ~/.bashrc or ~/.profile to use given compiler, by appending following lines, using e.g. this commands:
+	echo '# settings for Open-Transactions / and newcli' >> ~/.bashrc
+	echo 'export CC="ccache $HOME/.local/bin/clang" ; export CXX="ccache $HOME/.local/bin/clang++" ; export CPP="$HOME/.local/bin/clang -E"' >> ~/.bashrc
+	echo 'export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH' >> ~/.bashrc
+	source ~/.bashrc # re-read the settings to use them right now
+
+OR instead - you can use CUSTOM CONFIGURATION (advanced topic) as explained below:
+
+First, this setting configures the used computer:
+	export CC="ccache $HOME/.local/bin/clang" ; export CXX="ccache $HOME/.local/bin/clang++" ; export CPP="$HOME/.local/bin/clang -E"
+
+if you want to use other compiler then change this lines, e.g. system-wide clang (with ccache) then use something like:
+	export CC="ccache clang" ; export CXX="ccache clang++" ; export CPP="clang -E"
+
+and system-wide without ccache should be something like:
+	export CC="clang" ; export CXX="clang++" ; export CPP="clang -E"
+
+Next, ALSO append this line AS WELL (in either case, this is other setting):
+	export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+
+Keep in mind that certain parts of Open-Transactiona, like otcli (othint) sub-project might require new enough compiler version;
+It might be possible to set compiler for sub-project separatelly see subproject doc (e.g. in otcli/ a.k.a. othint/).
+
+After applying this changes (if you build previously with other compiler choice) you must clear cmake cache using:
+	rm -rf CMakeCache.txt CMakeFiles/
+in the directory where you will be running cmake, and then run cmake (e.g. "cmake .") and then make.
+
+For above change to take effect you need to log out and again log in to user account
+OR instead just do this command:
+	source ~/.bashrc
+
+-----------------------------------
+
+2. Build and install Open Transactions:
+	git clone git://github.com/monetas/opentxs.git
+	cd opentxs
+
+	# WARNING: if you do not have enough RAM (few GB)? then use -j 1. If you have lots of RAM and multicore CPU you can do -j 8 and more
+	# WARNING: If you want LOCAL INSTALLATION pass option '--prefix=$HOME/.local' to configure command
+	# WARNING: If installing globally root privileges are needed when running command 'make install'
+	./autogen.sh
+	./configure
+	make -j 2
+	make install
+
+-----------------------------------
+
+5. Run the software
+
+Follow instructions in INSTALL-Debian_Ubuntu.txt about how to start the software.
